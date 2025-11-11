@@ -1,10 +1,5 @@
 streamlit
 pandas
-numpy
 plotly
-
 scipy
-
-ydata-profiling
-matplotlib
-seaborn
+numpy
