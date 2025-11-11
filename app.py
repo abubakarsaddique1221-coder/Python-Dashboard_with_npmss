@@ -6,329 +6,260 @@ import plotly.graph_objects as go
 from scipy import stats
 import io
 
-# --- 1. SET UP THE PAGE ---
+# --- 1. SET UP THE PAGE WITH MODERN THEME ---
 st.set_page_config(
-    page_title="Polio Vaccine Data Explorer",
-    page_icon="🔬",
+    page_title="Polio Vaccine Dashboard",
+    page_icon="💉",
     layout="wide"
 )
 
-# --- 2. CUSTOM CSS ---
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .block-container { padding-top: 2rem; }
-    [data-testid="stSidebar"] { background-color: #0F172A; }
-    [data-testid="stSidebar"] h2 { color: #FFFFFF; }
-    [data-testid="stSidebar"] .st-emotion-cache-1gulkj5 { color: #E2E8F0; }
-    </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
-# --- 3. HELPER FUNCTION TO LOAD DATA ---
-# (We will define this inside section 5)
-
-# --- 4. GRAPH CUSTOMIZATION OPTIONS ---
-def get_color_themes():
-    return {
-        "Plotly Dark": "plotly_dark",
-        "Plotly White": "plotly_white",
-        "Plotly": "plotly",
-        "GGPlot": "ggplot2",
-        "Seaborn": "seaborn",
-        "Simple White": "simple_white",
-        "None (Custom Colors)": None
+# --- 2. MODERN CSS STYLING ---
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 3rem;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 2rem;
+        font-weight: bold;
     }
+    .section-header {
+        font-size: 1.8rem;
+        color: #2e86ab;
+        border-bottom: 2px solid #1f77b4;
+        padding-bottom: 0.5rem;
+        margin-top: 2rem;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+    }
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #2c3e50 0%, #3498db 100%);
+    }
+    [data-testid="stSidebar"] * {
+        color: white !important;
+    }
+    .stSelectbox, .stRadio {
+        margin-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-def get_color_scales():
-    return [
-        "Viridis", "Plasma", "Inferno", "Magma", "Cividis",
-        "Blues", "Reds", "Greens", "Purples", "Oranges",
-        "Rainbow", "Portland", "Hot", "Cool", "RdBu", "RdBu_r",
-        "Picnic", "Jet", "Electric"
-    ]
-
-def get_marker_symbols():
-    return ["circle", "square", "diamond", "cross", "x", "triangle-up", "triangle-down"]
-
-# --- 5. SIDEBAR - LOAD OUR DATA ---
-st.sidebar.title("Data Explorer 🔬")
-st.sidebar.header("1. Data Source")
-
-# THIS IS THE MODIFIED PART
-file_name = 'new cleaned file (1).csv'
-st.sidebar.info(f"Displaying data for:\n`{file_name}`")
-
+# --- 3. DATA LOADING ---
 @st.cache_data
-def load_data(file):
+def load_data():
     try:
-        # Use index_col=0 to correctly handle the 'Unnamed: 0' column
-        return pd.read_csv(file, index_col=0)
+        df = pd.read_csv('new cleaned file (1).csv', index_col=0)
+        return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
 
-df = load_data(file_name)
+# --- 4. SIDEBAR CONFIGURATION ---
+st.sidebar.markdown('<div style="text-align: center; margin-bottom: 2rem;">', unsafe_allow_html=True)
+st.sidebar.markdown('### 💉 Polio Vaccine Dashboard')
+st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
-# --- 6. MAIN PAGE - ANALYSIS ---
-st.title("Polio Vaccine (POL3) Data Explorer")
+# Load data
+df = load_data()
 
 if df is None:
-    st.error(f"Could not load data from `{file_name}`. Make sure the file is in the same directory.")
-else:
-    st.success("✅ Data loaded successfully!")
-    
-    all_columns = df.columns.tolist()
-    numeric_columns = df.select_dtypes(include=np.number).columns.tolist()
-    categorical_columns = df.select_dtypes(exclude=np.number).columns.tolist()
+    st.error("Could not load data. Please check if the file exists.")
+    st.stop()
 
-    st.sidebar.header("2. Choose Your Analysis")
-    
-    if not numeric_columns:
-        st.sidebar.warning("⚠️ No numeric columns found for some analyses.")
-    if not categorical_columns:
-        st.sidebar.warning("⚠️ No categorical columns found for some analyses.")
+# Analysis type selection
+analysis_type = st.sidebar.selectbox(
+    "📊 Analysis Type",
+    [
+        "Data Overview",
+        "Vaccine Trends",
+        "Country Comparison",
+        "Statistical Analysis"
+    ]
+)
 
-    analysis_type = st.sidebar.selectbox(
-        "Select Analysis Type:",
-        [
-            "Data Overview",
-            "Univariate Analysis (1 Column)",
-            "Bivariate Analysis (2 Columns)",
-            "Multivariate Analysis (Heatmap)",
-            "Advanced Visualizations"
-        ]
+# Quick filters
+st.sidebar.markdown("---")
+st.sidebar.markdown("**🔍 Quick Filters**")
+
+# Year filter if available
+if 'Year' in df.columns:
+    years = sorted(df['Year'].unique())
+    selected_years = st.sidebar.slider(
+        "Select Year Range",
+        min_value=int(min(years)),
+        max_value=int(max(years)),
+        value=(int(min(years)), int(max(years)))
     )
 
-    # Graph customization section in sidebar
-    st.sidebar.header("3. Graph Customization")
+# --- 5. MAIN DASHBOARD CONTENT ---
+st.markdown('<div class="main-header">Polio Vaccine Coverage Analysis</div>', unsafe_allow_html=True)
+
+# Key metrics at the top
+if 'Share polio vaccine (POL3)' in df.columns:
+    col1, col2, col3, col4 = st.columns(4)
     
-    color_themes = get_color_themes()
-    selected_theme = st.sidebar.selectbox("Color Theme", list(color_themes.keys()))
-    template = color_themes[selected_theme]
+    with col1:
+        avg_coverage = df['Share polio vaccine (POL3)'].mean()
+        st.metric("Average Coverage", f"{avg_coverage:.1f}%")
     
-    # Show additional customization options based on analysis type
-    show_customization = st.sidebar.checkbox("Show Advanced Graph Options", value=False)
+    with col2:
+        max_coverage = df['Share polio vaccine (POL3)'].max()
+        st.metric("Highest Coverage", f"{max_coverage:.1f}%")
     
-    if show_customization:
-        color_scale = st.sidebar.selectbox("Color Scale", get_color_scales(), index=0)
-        marker_symbol = st.sidebar.selectbox("Marker Symbol", get_marker_symbols(), index=0)
-        marker_size = st.sidebar.slider("Marker Size", 1, 20, 6)
-        line_width = st.sidebar.slider("Line Width", 1, 10, 2)
-        opacity = st.sidebar.slider("Opacity", 0.1, 1.0, 0.8)
-        show_grid = st.sidebar.checkbox("Show Grid", value=True)
-    else:
-        color_scale = "Viridis"
-        marker_symbol = "circle"
-        marker_size = 6
-        line_width = 2
-        opacity = 0.8
-        show_grid = True
+    with col3:
+        countries = df['Entity'].nunique() if 'Entity' in df.columns else "N/A"
+        st.metric("Countries", countries)
+    
+    with col4:
+        years_span = df['Year'].max() - df['Year'].min() if 'Year' in df.columns else "N/A"
+        st.metric("Years Covered", years_span)
 
-    # ----------- ANALYSIS SECTIONS -----------
+# --- 6. ANALYSIS SECTIONS ---
 
-    # DATA OVERVIEW
-    if analysis_type == "Data Overview":
-        st.header("📊 Data Overview")
-        st.subheader("Raw Data (First 10 Rows)")
-        st.dataframe(df.head(10))
+# DATA OVERVIEW
+if analysis_type == "Data Overview":
+    st.markdown('<div class="section-header">📈 Data Overview</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("Dataset Preview")
+        st.dataframe(df.head(10), use_container_width=True)
+    
+    with col2:
+        st.subheader("Key Information")
+        st.write(f"**Total Records:** {len(df):,}")
+        st.write(f"**Total Columns:** {len(df.columns)}")
+        st.write(f"**Data Period:** {df['Year'].min()}-{df['Year'].max()}" if 'Year' in df.columns else "N/A")
         
-        st.subheader("Descriptive Statistics (Numerical Columns)")
-        if numeric_columns:
-            st.dataframe(df[numeric_columns].describe())
-        else:
-            st.info("No numerical columns to describe.")
-            
-        st.subheader("Column Information (Data Types & Non-Nulls)")
-        buffer = io.StringIO()
-        df.info(buf=buffer)
-        st.text(buffer.getvalue())
+        if 'Share polio vaccine (POL3)' in df.columns:
+            st.write(f"**Coverage Range:** {df['Share polio vaccine (POL3)'].min():.1f}% - {df['Share polio vaccine (POL3)'].max():.1f}%")
+
+    # Basic statistics
+    st.subheader("Statistical Summary")
+    if 'Share polio vaccine (POL3)' in df.columns:
+        st.dataframe(df['Share polio vaccine (POL3)'].describe(), use_container_width=True)
+
+# VACCINE TRENDS
+elif analysis_type == "Vaccine Trends":
+    st.markdown('<div class="section-header">📊 Vaccine Trends Over Time</div>', unsafe_allow_html=True)
+    
+    if all(col in df.columns for col in ['Entity', 'Year', 'Share polio vaccine (POL3)']):
+        # Top countries selection
+        top_countries = st.multiselect(
+            "Select Countries to Display",
+            options=df['Entity'].unique(),
+            default=df.groupby('Entity')['Share polio vaccine (POL3)'].mean().nlargest(5).index.tolist()
+        )
         
-        st.subheader("Data Quality Check")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Rows", len(df))
-        with col2:
-            st.metric("Total Columns", len(df.columns))
-        with col3:
-            st.metric("Missing Values", df.isnull().sum().sum())
-
-    # UNIVARIATE ANALYSIS
-    elif analysis_type == "Univariate Analysis (1 Column)":
-        st.header("📈 Univariate Analysis")
-        selected_col = st.selectbox("Select a column:", all_columns)
-        
-        if selected_col:
-            if selected_col in numeric_columns:
-                chart_type = st.radio("Select Chart Type:", 
-                                      ["Histogram", "Box Plot", "Violin Plot", "Density Plot"], 
-                                      horizontal=True)
-                
-                if chart_type == "Histogram":
-                    fig = px.histogram(df, x=selected_col, marginal="box", 
-                                     title=f"Distribution of {selected_col}", 
-                                     template=template,
-                                     color_discrete_sequence=px.colors.sequential[color_scale])
-                elif chart_type == "Box Plot":
-                    fig = px.box(df, y=selected_col, title=f"Box Plot of {selected_col}", 
-                                 template=template,
-                                 color_discrete_sequence=px.colors.sequential[color_scale])
-                elif chart_type == "Violin Plot":
-                    fig = px.violin(df, y=selected_col, title=f"Violin Plot of {selected_col}", 
-                                    template=template,
-                                    color_discrete_sequence=px.colors.sequential[color_scale])
-                else:
-                    fig = px.histogram(df, x=selected_col, marginal="rug",
-                                     title=f"Density Plot of {selected_col}", 
-                                     template=template,
-                                     color_discrete_sequence=px.colors.sequential[color_scale])
-
-                # ✅ Fixed showgrid
-                fig.update_xaxes(showgrid=show_grid)
-                fig.update_yaxes(showgrid=show_grid)
-                st.plotly_chart(fig, use_container_width=True)
-                
-            else:
-                chart_type = st.radio("Select Chart Type:", ["Bar Chart", "Pie Chart", "Treemap"], horizontal=True)
-                counts = df[selected_col].value_counts().reset_index()
-                counts.columns = [selected_col, 'count']
-                
-                if chart_type == "Bar Chart":
-                    fig = px.bar(counts.head(20), x=selected_col, y='count', 
-                                 title=f"Top 20 Values for {selected_col}", 
-                                 template=template,
-                                 color='count', color_continuous_scale=color_scale)
-                elif chart_type == "Pie Chart":
-                    fig = px.pie(counts.head(10), names=selected_col, values='count',
-                                 title=f"Pie Chart of {selected_col}", template=template)
-                else:
-                    fig = px.treemap(counts.head(15), path=[selected_col], values='count',
-                                     title=f"Treemap of {selected_col}", template=template,
-                                     color='count', color_continuous_scale=color_scale)
-                
-                fig.update_xaxes(showgrid=show_grid)
-                fig.update_yaxes(showgrid=show_grid)
-                st.plotly_chart(fig, use_container_width=True)
-
-    # BIVARIATE ANALYSIS
-    elif analysis_type == "Bivariate Analysis (2 Columns)":
-        st.header("🔍 Bivariate Analysis")
-        col1, col2 = st.columns(2)
-        with col1:
-            x_col = st.selectbox("Select X-axis column:", all_columns)
-        with col2:
-            y_col = st.selectbox("Select Y-axis column:", all_columns)
-
-        if x_col and y_col:
-            x_is_num = x_col in numeric_columns
-            y_is_num = y_col in numeric_columns
-
-            # NUMERIC vs NUMERIC
-            if x_is_num and y_is_num:
-                chart_type = st.radio("Chart Type:", ["Scatter Plot", "Line Plot", "Hexbin Plot"], horizontal=True)
-                if chart_type == "Scatter Plot":
-                    fig = px.scatter(df, x=x_col, y=y_col, trendline="ols",
-                                     title=f"{x_col} vs. {y_col}", 
-                                     template=template, opacity=opacity,
-                                     color_discrete_sequence=px.colors.sequential[color_scale])
-                    fig.update_traces(marker=dict(size=marker_size, symbol=marker_symbol))
-                elif chart_type == "Line Plot":
-                    fig = px.line(df, x=x_col, y=y_col, title=f"{x_col} vs. {y_col}", template=template)
-                    fig.update_traces(line=dict(width=line_width))
-                else:
-                    fig = px.density_heatmap(df, x=x_col, y=y_col, 
-                                             title=f"Hexbin Plot: {x_col} vs. {y_col}",
-                                             template=template, color_continuous_scale=color_scale)
-
-                fig.update_xaxes(showgrid=show_grid)
-                fig.update_yaxes(showgrid=show_grid)
-                st.plotly_chart(fig, use_container_width=True)
-
-            # CATEGORICAL vs NUMERIC
-            elif (not x_is_num and y_is_num) or (x_is_num and not y_is_num):
-                cat_col = x_col if not x_is_num else y_col
-                num_col = y_col if y_is_num else x_col
-                chart_type = st.radio("Chart Type:", ["Box Plot", "Violin Plot", "Bar Chart", "Strip Plot"], horizontal=True)
-                if chart_type == "Box Plot":
-                    fig = px.box(df, x=cat_col, y=num_col, template=template, color=cat_col)
-                elif chart_type == "Violin Plot":
-                    fig = px.violin(df, x=cat_col, y=num_col, template=template, color=cat_col)
-                elif chart_type == "Bar Chart":
-                    agg_df = df.groupby(cat_col)[num_col].mean().reset_index()
-                    fig = px.bar(agg_df, x=cat_col, y=num_col, template=template, color=cat_col)
-                else:
-                    fig = px.strip(df, x=cat_col, y=num_col, template=template, color=cat_col)
-
-                fig.update_xaxes(showgrid=show_grid)
-                fig.update_yaxes(showgrid=show_grid)
-                st.plotly_chart(fig, use_container_width=True)
-
-    # MULTIVARIATE (HEATMAP)
-    elif analysis_type == "Multivariate Analysis (Heatmap)":
-        st.header("🔥 Multivariate Analysis: Correlation Heatmap")
-        if len(numeric_columns) > 1:
-            # We explicitly select only numeric columns for correlation
-            corr_matrix = df[numeric_columns].corr()
-            fig = px.imshow(corr_matrix, text_auto=True, title="Correlation Heatmap",
-                            template=template, color_continuous_scale=color_scale)
-            fig.update_xaxes(showgrid=show_grid)
-            fig.update_yaxes(showgrid=show_grid)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("You need at least two numeric columns for this analysis.")
+        if top_countries:
+            filtered_df = df[df['Entity'].isin(top_countries)]
             
-    # ADVANCED VISUALIZATIONS
-    elif analysis_type == "Advanced Visualizations":
-        st.header("🌍 Advanced Visualizations")
-        
-        # Check if the necessary columns ('Entity', 'Year', 'Share polio vaccine (POL3)') exist
-        required_cols = ['Entity', 'Year', 'Share polio vaccine (POL3)']
-        if all(col in df.columns for col in required_cols):
-            
-            st.subheader("Polio Vaccine Share Over Time (Line Plot)")
-            # Get a list of top 20 entities by average share
-            top_entities = df.groupby('Entity')['Share polio vaccine (POL3)'].mean().nlargest(20).index.tolist()
-            
-            selected_entities = st.multiselect(
-                "Select Entities (Countries) to plot:",
-                options=df['Entity'].unique(),
-                default=top_entities[:5] # Default to top 5
+            # Line chart
+            fig = px.line(
+                filtered_df, 
+                x='Year', 
+                y='Share polio vaccine (POL3)', 
+                color='Entity',
+                title='Polio Vaccine Coverage Over Time',
+                labels={'Share polio vaccine (POL3)': 'Vaccine Coverage (%)', 'Year': 'Year'}
             )
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#2c3e50')
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Distribution over time
+        st.subheader("Coverage Distribution by Year")
+        fig_box = px.box(
+            df, 
+            x='Year', 
+            y='Share polio vaccine (POL3)',
+            title='Vaccine Coverage Distribution by Year'
+        )
+        st.plotly_chart(fig_box, use_container_width=True)
+
+# COUNTRY COMPARISON
+elif analysis_type == "Country Comparison":
+    st.markdown('<div class="section-header">🌍 Country Comparison</div>', unsafe_allow_html=True)
+    
+    if all(col in df.columns for col in ['Entity', 'Share polio vaccine (POL3)']):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Top performing countries
+            st.subheader("Top Performing Countries")
+            top_countries = df.groupby('Entity')['Share polio vaccine (POL3)'].mean().nlargest(10)
+            fig_bar = px.bar(
+                x=top_countries.values,
+                y=top_countries.index,
+                orientation='h',
+                title='Average Vaccine Coverage by Country',
+                labels={'x': 'Coverage (%)', 'y': 'Country'}
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+        
+        with col2:
+            # Coverage distribution
+            st.subheader("Global Coverage Distribution")
+            fig_hist = px.histogram(
+                df, 
+                x='Share polio vaccine (POL3)',
+                nbins=30,
+                title='Distribution of Vaccine Coverage',
+                labels={'Share polio vaccine (POL3)': 'Coverage (%)'}
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+# STATISTICAL ANALYSIS
+elif analysis_type == "Statistical Analysis":
+    st.markdown('<div class="section-header">📐 Statistical Analysis</div>', unsafe_allow_html=True)
+    
+    if 'Share polio vaccine (POL3)' in df.columns:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Correlation Analysis")
+            numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
             
-            if selected_entities:
-                plot_df = df[df['Entity'].isin(selected_entities)]
-                fig_line = px.line(plot_df, x='Year', y='Share polio vaccine (POL3)', color='Entity',
-                                   title='Polio Vaccine Share Over Time',
-                                   template=template, markers=True)
-                fig_line.update_traces(marker=dict(size=marker_size, symbol=marker_symbol), line=dict(width=line_width))
-                fig_line.update_xaxes(showgrid=show_grid)
-                fig_line.update_yaxes(showgrid=show_grid)
-                st.plotly_chart(fig_line, use_container_width=True)
-            else:
-                st.info("Please select at least one entity to plot.")
-
-            st.subheader("Vaccine Share Distribution by Year (Animated)")
-            # Use a smaller sample for animation if the dataset is large
-            anim_df = df.sample(min(2000, len(df)))
+            if len(numeric_cols) > 1:
+                corr_matrix = df[numeric_cols].corr()
+                fig_heatmap = px.imshow(
+                    corr_matrix,
+                    text_auto=True,
+                    aspect="auto",
+                    title="Correlation Matrix",
+                    color_continuous_scale="RdBu_r"
+                )
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+        
+        with col2:
+            st.subheader("Statistical Tests")
             
-            fig_anim = px.scatter(anim_df, 
-                                  x="Year", y="Share polio vaccine (POL3)",
-                                  animation_frame="Year", 
-                                  size="Share polio vaccine (POL3)", 
-                                  color="Entity", 
-                                  hover_name="Entity",
-                                  log_x=False, 
-                                  size_max=marker_size * 5, 
-                                  template=template,
-                                  title="Animated Scatter Plot by Year")
-            st.plotly_chart(fig_anim, use_container_width=True)
-
-        else:
-            st.warning("This visualization requires 'Entity', 'Year', and 'Share polio vaccine (POL3)' columns.")
-
+            # Basic stats
+            coverage_data = df['Share polio vaccine (POL3)'].dropna()
+            st.write(f"**Sample Size:** {len(coverage_data):,}")
+            st.write(f"**Mean:** {coverage_data.mean():.2f}%")
+            st.write(f"**Standard Deviation:** {coverage_data.std():.2f}%")
+            st.write(f"**Variance:** {coverage_data.var():.2f}")
+            
+            # Normality test
+            if len(coverage_data) > 3:
+                stat, p_value = stats.normaltest(coverage_data)
+                st.write(f"**Normality Test p-value:** {p_value:.4f}")
 
 # --- 7. FOOTER ---
-st.sidebar.markdown("---")
-st.sidebar.info("📊 Pro Data Explorer v1.1 — Explore your datasets visually and interactively!")
+st.markdown("---")
+st.markdown(
+    "<div style='text-align: center; color: #666;'>"
+    "Polio Vaccine Dashboard • Built with Streamlit • Data Source: Your Dataset"
+    "</div>", 
+    unsafe_allow_html=True
+)
