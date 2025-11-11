@@ -8,7 +8,7 @@ import io
 
 # --- 1. SET UP THE PAGE ---
 st.set_page_config(
-    page_title="Pro Data Explorer",
+    page_title="Polio Vaccine Data Explorer",
     page_icon="🔬",
     layout="wide"
 )
@@ -28,21 +28,7 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # --- 3. HELPER FUNCTION TO LOAD DATA ---
-@st.cache_data
-def load_data(source):
-    try:
-        if isinstance(source, io.StringIO) or isinstance(source, io.BytesIO):
-            return pd.read_csv(source)
-        elif isinstance(source, str):
-            if source.endswith('.csv'):
-                return pd.read_csv(source)
-            else:
-                st.error("URL must point to a .csv file.")
-                return None
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return None
-    return None
+# (We will define this inside section 5)
 
 # --- 4. GRAPH CUSTOMIZATION OPTIONS ---
 def get_color_themes():
@@ -67,28 +53,30 @@ def get_color_scales():
 def get_marker_symbols():
     return ["circle", "square", "diamond", "cross", "x", "triangle-up", "triangle-down"]
 
-# --- 5. SIDEBAR - CONTROLS ---
+# --- 5. SIDEBAR - LOAD OUR DATA ---
 st.sidebar.title("Data Explorer 🔬")
-st.sidebar.write("Upload your data and start exploring!")
-st.sidebar.header("1. Get Your Data")
-data_source = st.sidebar.radio("Choose data source:", ("Upload a file", "Enter a URL"))
+st.sidebar.header("1. Data Source")
 
-df = None
+# THIS IS THE MODIFIED PART
+file_name = 'new cleaned file (1).csv'
+st.sidebar.info(f"Displaying data for:\n`{file_name}`")
 
-if data_source == "Upload a file":
-    uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
-    if uploaded_file:
-        df = load_data(uploaded_file)
-else:
-    data_url = st.sidebar.text_input("Paste a URL to a CSV file")
-    if data_url:
-        df = load_data(data_url)
+@st.cache_data
+def load_data(file):
+    try:
+        # Use index_col=0 to correctly handle the 'Unnamed: 0' column
+        return pd.read_csv(file, index_col=0)
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
+
+df = load_data(file_name)
 
 # --- 6. MAIN PAGE - ANALYSIS ---
-st.title("Pro Data Explorer")
+st.title("Polio Vaccine (POL3) Data Explorer")
 
 if df is None:
-    st.info("Please upload a CSV file or provide a URL in the sidebar to begin.")
+    st.error(f"Could not load data from `{file_name}`. Make sure the file is in the same directory.")
 else:
     st.success("✅ Data loaded successfully!")
     
@@ -209,16 +197,16 @@ else:
                 
                 if chart_type == "Bar Chart":
                     fig = px.bar(counts.head(20), x=selected_col, y='count', 
-                               title=f"Top 20 Values for {selected_col}", 
-                               template=template,
-                               color='count', color_continuous_scale=color_scale)
+                                 title=f"Top 20 Values for {selected_col}", 
+                                 template=template,
+                                 color='count', color_continuous_scale=color_scale)
                 elif chart_type == "Pie Chart":
                     fig = px.pie(counts.head(10), names=selected_col, values='count',
-                               title=f"Pie Chart of {selected_col}", template=template)
+                                 title=f"Pie Chart of {selected_col}", template=template)
                 else:
                     fig = px.treemap(counts.head(15), path=[selected_col], values='count',
-                                   title=f"Treemap of {selected_col}", template=template,
-                                   color='count', color_continuous_scale=color_scale)
+                                     title=f"Treemap of {selected_col}", template=template,
+                                     color='count', color_continuous_scale=color_scale)
                 
                 fig.update_xaxes(showgrid=show_grid)
                 fig.update_yaxes(showgrid=show_grid)
@@ -242,17 +230,17 @@ else:
                 chart_type = st.radio("Chart Type:", ["Scatter Plot", "Line Plot", "Hexbin Plot"], horizontal=True)
                 if chart_type == "Scatter Plot":
                     fig = px.scatter(df, x=x_col, y=y_col, trendline="ols",
-                                   title=f"{x_col} vs. {y_col}", 
-                                   template=template, opacity=opacity,
-                                   color_discrete_sequence=px.colors.sequential[color_scale])
+                                     title=f"{x_col} vs. {y_col}", 
+                                     template=template, opacity=opacity,
+                                     color_discrete_sequence=px.colors.sequential[color_scale])
                     fig.update_traces(marker=dict(size=marker_size, symbol=marker_symbol))
                 elif chart_type == "Line Plot":
                     fig = px.line(df, x=x_col, y=y_col, title=f"{x_col} vs. {y_col}", template=template)
                     fig.update_traces(line=dict(width=line_width))
                 else:
                     fig = px.density_heatmap(df, x=x_col, y=y_col, 
-                                           title=f"Hexbin Plot: {x_col} vs. {y_col}",
-                                           template=template, color_continuous_scale=color_scale)
+                                             title=f"Hexbin Plot: {x_col} vs. {y_col}",
+                                             template=template, color_continuous_scale=color_scale)
 
                 fig.update_xaxes(showgrid=show_grid)
                 fig.update_yaxes(showgrid=show_grid)
@@ -281,6 +269,7 @@ else:
     elif analysis_type == "Multivariate Analysis (Heatmap)":
         st.header("🔥 Multivariate Analysis: Correlation Heatmap")
         if len(numeric_columns) > 1:
+            # We explicitly select only numeric columns for correlation
             corr_matrix = df[numeric_columns].corr()
             fig = px.imshow(corr_matrix, text_auto=True, title="Correlation Heatmap",
                             template=template, color_continuous_scale=color_scale)
@@ -289,6 +278,56 @@ else:
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("You need at least two numeric columns for this analysis.")
+            
+    # ADVANCED VISUALIZATIONS
+    elif analysis_type == "Advanced Visualizations":
+        st.header("🌍 Advanced Visualizations")
+        
+        # Check if the necessary columns ('Entity', 'Year', 'Share polio vaccine (POL3)') exist
+        required_cols = ['Entity', 'Year', 'Share polio vaccine (POL3)']
+        if all(col in df.columns for col in required_cols):
+            
+            st.subheader("Polio Vaccine Share Over Time (Line Plot)")
+            # Get a list of top 20 entities by average share
+            top_entities = df.groupby('Entity')['Share polio vaccine (POL3)'].mean().nlargest(20).index.tolist()
+            
+            selected_entities = st.multiselect(
+                "Select Entities (Countries) to plot:",
+                options=df['Entity'].unique(),
+                default=top_entities[:5] # Default to top 5
+            )
+            
+            if selected_entities:
+                plot_df = df[df['Entity'].isin(selected_entities)]
+                fig_line = px.line(plot_df, x='Year', y='Share polio vaccine (POL3)', color='Entity',
+                                   title='Polio Vaccine Share Over Time',
+                                   template=template, markers=True)
+                fig_line.update_traces(marker=dict(size=marker_size, symbol=marker_symbol), line=dict(width=line_width))
+                fig_line.update_xaxes(showgrid=show_grid)
+                fig_line.update_yaxes(showgrid=show_grid)
+                st.plotly_chart(fig_line, use_container_width=True)
+            else:
+                st.info("Please select at least one entity to plot.")
+
+            st.subheader("Vaccine Share Distribution by Year (Animated)")
+            # Use a smaller sample for animation if the dataset is large
+            anim_df = df.sample(min(2000, len(df)))
+            
+            fig_anim = px.scatter(anim_df, 
+                                  x="Year", y="Share polio vaccine (POL3)",
+                                  animation_frame="Year", 
+                                  size="Share polio vaccine (POL3)", 
+                                  color="Entity", 
+                                  hover_name="Entity",
+                                  log_x=False, 
+                                  size_max=marker_size * 5, 
+                                  template=template,
+                                  title="Animated Scatter Plot by Year")
+            st.plotly_chart(fig_anim, use_container_width=True)
+
+        else:
+            st.warning("This visualization requires 'Entity', 'Year', and 'Share polio vaccine (POL3)' columns.")
+
 
 # --- 7. FOOTER ---
 st.sidebar.markdown("---")
